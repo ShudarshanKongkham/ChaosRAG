@@ -1,0 +1,13 @@
+streamlit
+torch
+torchvision
+langchain==0.1.0
+langchain-community
+sentence-transformers==2.2.2
+transformers==4.35.0
+faiss-gpu
+pypdf
+tf-keras
+tensorflow==2.15.0
+huggingface_hub
+pillow
