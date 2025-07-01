@@ -15,7 +15,7 @@ from langchain.prompts import PromptTemplate
 # Set page config
 st.set_page_config(
     page_title="ChaosRAG - Landmine Identification System",
-    page_icon="⚠️",
+    page_icon="💣",
     layout="wide"
 )
 
@@ -44,7 +44,7 @@ st.markdown("""
         margin: 1rem 0;
     }
     .danger-box {
-        background-color: #f8d7da;
+        background-color: linear-gradient(90deg, #ff6b6b, #feca57);
         border: 1px solid #f5c6cb;
         padding: 1rem;
         border-radius: 5px;
@@ -56,8 +56,8 @@ st.markdown("""
 # Title and header
 st.markdown("""
 <div class="main-header">
-    <h1>⚠️ ChaosRAG - Landmine Identification System</h1>
-    <p>AI-Powered Image Classification & Knowledge Retrieval for EOD Operations</p>
+    <h1>⚠️💣 HoldFast - Landmine Identification System</h1>
+    <p>AI-Powered Image Classification & Knowledge Retrieval for EOD(Explosive Ordnance Disposal) Operations</p>
 </div>
 """, unsafe_allow_html=True)
 
@@ -145,7 +145,7 @@ def load_rag_system():
         # Initialize LLM
         llm = Ollama(model="llama3.1")
         
-        # Define custom prompt template
+        # Define custom prompt template for general queries
         template = """You are a specialized explosive ordnance disposal (EOD) expert and landmine identification specialist. 
 Your role is to assist defense personnel in identifying landmines based on field descriptions and available intelligence or 
 provide all known information based on the name/type of the landmine.
@@ -160,6 +160,24 @@ Expert Analysis:"""
             template=template, 
             input_variables=["context", "question"]
         )
+        
+        # Define custom prompt template for description matching
+        description_template = """You are a specialized explosive ordnance disposal (EOD) expert and landmine identification specialist. 
+Your role is to assist defense personnel in identifying landmines based on field descriptions and available intelligence.
+
+Your are to list 5 most likely landmine type and model based on the field description provided. 
+CRITICAL : Use the exact name of the landmine type and model based on the field description provided in the context.
+
+Context: {context}
+
+Field Description/Question: {question}
+
+Expert Analysis:"""
+
+        description_prompt = PromptTemplate(
+            template=description_template, 
+            input_variables=["context", "question"]
+        )
 
         # Create RetrievalQA with custom prompt
         qa = RetrievalQA.from_chain_type(
@@ -170,11 +188,20 @@ Expert Analysis:"""
             return_source_documents=True
         )
         
-        return qa, retriever
+        # Create RetrievalQA for description matching
+        qa_description = RetrievalQA.from_chain_type(
+            llm=llm,
+            chain_type="stuff",
+            retriever=retriever,
+            chain_type_kwargs={"prompt": description_prompt},
+            return_source_documents=True
+        )
+        
+        return qa, qa_description, retriever
         
     except Exception as e:
         st.error(f"Error loading RAG system: {str(e)}")
-        return None, None
+        return None, None, None
 
 def classify_image(image, model, classes, device):
     """Classify uploaded image and return top 5 predictions"""
@@ -217,7 +244,7 @@ def get_landmine_info(landmine_name, qa_system):
 
 # Load models
 model, classes, device = load_classification_model()
-qa_system, retriever = load_rag_system()
+qa_system, qa_description_system, retriever = load_rag_system()
 
 # Main application layout
 col1, col2 = st.columns([1, 1])
@@ -258,6 +285,12 @@ with col1:
                 # Extract the class name from the selected option
                 selected_class = selected_prediction.split(" (")[0]
                 
+                # Button to get information for selected class
+                get_class_info = st.button(
+                    f"📖 Get Information for {selected_class}",
+                    help="Click to retrieve detailed information about the selected landmine type"
+                )
+                
                 # Display classification results
                 st.markdown("#### Classification Results:")
                 for i, (class_name, prob) in enumerate(zip(top5_classes, top5_probs)):
@@ -278,12 +311,17 @@ with col2:
     
     # Determine which query to use
     query_to_use = None
-    if uploaded_file is not None and 'selected_class' in locals():
+    query_source = None
+    
+    # Check if classification button was clicked
+    if uploaded_file is not None and 'get_class_info' in locals() and get_class_info and 'selected_class' in locals():
         query_to_use = selected_class
-        st.info(f"Using classification result: **{selected_class}**")
+        query_source = "classification"
+        st.info(f"🎯 Using classification result: **{selected_class}**")
     elif manual_query:
         query_to_use = manual_query
-        st.info(f"Using manual query: **{manual_query}**")
+        query_source = "manual"
+        st.info(f"✍️ Using manual query: **{manual_query}**")
     
     # Get landmine information
     if query_to_use and qa_system:
@@ -307,6 +345,79 @@ with col2:
                         st.markdown(f"Content: {doc.page_content[:300]}...")
                         st.markdown("---")
 
+# Description-based landmine matching section
+st.markdown("---")
+st.header("🔍 Description-Based Landmine Identification")
+st.markdown("Describe the physical characteristics of a suspected landmine to find the top 5 most likely matches.")
+
+description_col1, description_col2 = st.columns([3, 2])
+
+with description_col1:
+    st.markdown("### 📝 Physical Description Input")
+    
+    # Text area for detailed description
+    landmine_description = st.text_area(
+        "Describe the landmine's physical characteristics:",
+        placeholder="""Example: Cast iron fragmenting body, Preformed steel fragments, Empty fuze well for various fuzing options, including electronic fuzes or command initiation, Tripwires with two green painted wooden or metal stakes for affixing.
+
+Or: A vertically oriented cylindrical main body, painted in matte olive drab with occasional darkened spots or stenciled serial markings. The four folding support legs extend outward in a tripod-like arrangement with squared rubberized feet...""",
+        height=150,
+        help="Provide detailed physical characteristics including: body material, color, shape, size, fuzing mechanisms, markings, etc."
+    )
+    
+    # Analysis button
+    analyze_description = st.button(
+        "🔍 Analyze Description",
+        disabled=not landmine_description.strip(),
+        help="Click to find the top 5 most likely landmine matches"
+    )
+
+with description_col2:
+    st.markdown("### 💡 Description Guidelines")
+    st.markdown("""
+    **Include details about:**
+    - **Body material**: metal, plastic, wood
+    - **Shape**: cylindrical, rectangular, round
+    - **Color**: olive drab, green, black, etc.
+    - **Size**: approximate dimensions
+    - **Fuzing**: pressure plate, tripwire, electronic
+    - **Markings**: text, symbols, numbers
+    - **Components**: legs, fins, parachutes
+    - **Surface**: paint, rust, weathering
+    """)
+    
+    st.markdown("### 🎯 What You'll Get:")
+    st.markdown("""
+    - Top 5 most likely landmine matches
+    - Exact landmine names from database
+    - Confidence ranking
+    - Supporting evidence from sources
+    """)
+
+# Display description analysis results
+if analyze_description and landmine_description.strip() and qa_description_system:
+    with st.spinner("Analyzing description and finding matches..."):
+        description_result, description_sources = get_landmine_info(landmine_description, qa_description_system)
+    
+    if description_result:
+        st.markdown("### 🎯 Top 5 Matching Landmines")
+        st.markdown(f"""
+        <div class="result-box" style="color: white;">
+            {description_result}
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Show source documents for description analysis
+        if description_sources:
+            with st.expander("📚 Supporting Evidence from Sources"):
+                for i, doc in enumerate(description_sources):
+                    st.markdown(f"**Evidence Source {i+1}:**")
+                    st.markdown(f"Page: {doc.metadata.get('page', 'Unknown')}")
+                    st.markdown(f"Content: {doc.page_content[:400]}...")
+                    if len(doc.page_content) > 400:
+                        st.markdown("[Content truncated...]")
+                    st.markdown("---")
+
 # Sidebar with additional information
 with st.sidebar:
     st.header("ℹ️ System Information")
@@ -322,16 +433,28 @@ with st.sidebar:
     else:
         st.error("❌ RAG System Failed to Load")
     
+    if qa_description_system is not None:
+        st.success("✅ Description Matching System Loaded")
+    else:
+        st.error("❌ Description Matching System Failed to Load")
+    
     device_info = "CUDA" if torch.cuda.is_available() else "CPU"
     st.info(f"🖥️ Running on: {device_info}")
     
     st.markdown("### 📖 Usage Instructions:")
     st.markdown("""
-    1. **Upload Image**: Upload a clear image of the suspected landmine
-    2. **Review Predictions**: Check the top 5 classification results
-    3. **Select Prediction**: Choose a prediction from the dropdown
-    4. **Get Information**: Detailed information will appear automatically
-    5. **Manual Query**: You can also search manually by name
+    **Image Classification:**
+    1. Upload a clear image of the suspected landmine
+    2. Review the top 5 classification results
+    3. Select a prediction from the dropdown
+    4. Get detailed information automatically
+    
+    **Manual Search:**
+    5. Enter a landmine name manually for direct lookup
+    
+    **Description Matching:**
+    6. Describe physical characteristics in detail
+    7. Click "Analyze Description" for top 5 matches
     """)
     
     st.markdown("### ⚠️ Safety Reminders:")
