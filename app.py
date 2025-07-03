@@ -274,7 +274,8 @@ with col1:
                 # Create a selectbox for the predictions
                 prediction_options = []
                 for i, (class_name, prob) in enumerate(zip(top5_classes, top5_probs)):
-                    prediction_options.append(f"{class_name} ({prob:.2%} confidence)")
+                    prediction_options.append(f"{class_name}")
+                    # prediction_options.append(f"{class_name} ({prob:.2%} confidence)")
                 
                 selected_prediction = st.selectbox(
                     "Select a classification result for detailed information:",
