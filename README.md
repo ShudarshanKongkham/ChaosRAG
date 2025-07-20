@@ -45,6 +45,9 @@ ollama pull nomic-embed-text
 3. Follow the interactive prompts to describe suspected landmines
 4. Receive expert analysis and safety recommendations
 
+## Demo
+Link- https://www.youtube.com/watch?v=_tT7rII_dm0
+
 ## Safety Notice
 
 ⚠️ **CRITICAL**: This system is for educational and training purposes. Always follow proper EOD protocols and contact qualified specialists for real explosive ordnance situations.
