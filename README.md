@@ -2,7 +2,7 @@
 
 A Retrieval-Augmented Generation (RAG) system designed to assist defense personnel in identifying landmines based on field descriptions and intelligence data.
 
-## Features
+## Features 
 
 - **Expert EOD Analysis**: Acts as a specialized explosive ordnance disposal expert
 - **Landmine Identification**: Identifies landmine types based on physical descriptions
